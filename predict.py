@@ -6,6 +6,7 @@ import network
 from collections import OrderedDict
 from tqdm import tqdm
 import os
+import argparse
 gdal.DontUseExceptions()
 
 def readTif(fileName):
@@ -44,8 +45,16 @@ def writeTiff(fileName, data, im_geotrans=(0, 0, 0, 0, 0, 0), im_proj=""):
     del dataset
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run MALS-Net inference on paired DOM/depth tiles.')
+    parser.add_argument('--test-dir', default='data/test')
+    parser.add_argument('--checkpoint', default='utils/check.pth')
+    parser.add_argument('--output-dir', default='utils/predict_test')
+    parser.add_argument('--threshold', type=float, default=0.5)
+    args = parser.parse_args()
 
-    test_image_data_path = glob.glob('../data/test/image\\*.tif')
+    test_image_data_path = sorted(glob.glob(os.path.join(args.test_dir, 'image', '*.tif')))
+    if not test_image_data_path:
+        raise FileNotFoundError(f"No TIFF images found under {args.test_dir}/image")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = network.deeplabv3plus_ECAResNet50(
         num_classes=1,
@@ -55,18 +64,18 @@ if __name__ == "__main__":
     net = model.to(device=device)
 
     # 加载模型参数    
-    net.load_state_dict(torch.load('utils/check.pth', map_location=device))
+    net.load_state_dict(torch.load(args.checkpoint, map_location=device, weights_only=True))
     net.eval()
     # 遍历所有图片
     for image_path in tqdm(test_image_data_path):
         feature = OrderedDict()       
-        filename = image_path.split('\\')[-1]
-        save_dir = 'utils/predict_test/'
+        filename = os.path.basename(image_path)
+        save_dir = args.output_dir
         # 检查并创建（如果不存在）
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         save_res_path = os.path.join(save_dir, filename)
-        dem_path = '../data/test/dem/' + image_path.split('\\')[-1]
+        dem_path = os.path.join(args.test_dir, 'dem', filename)
         image = readTif(image_path)
         dem = readTif(dem_path)
         image = image.reshape(1, 1, image.shape[0], image.shape[1])
@@ -78,9 +87,9 @@ if __name__ == "__main__":
         feature['image'] = image
         feature['dem'] = dem
         pred = net(feature)
-        pred = np.array(pred.data.cpu()[0])[0]
-        pred[pred >= 0.5] = 255
-        pred[pred < 0.5] = 0
+        pred = torch.sigmoid(pred).detach().cpu().numpy()[0, 0]
+        pred[pred >= args.threshold] = 255
+        pred[pred < args.threshold] = 0
         pred = pred.astype(np.uint8)
 
         writeTiff(save_res_path, pred)

@@ -11,6 +11,9 @@ import torch.optim as optim
 import sys
 import torch.nn as nn
 import torch.nn.functional as F
+import argparse
+import random
+import numpy as np
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 torch.backends.cudnn.enabled = True
@@ -53,7 +56,22 @@ class FocalLoss(nn.Module):
             return focal_loss
 
 
-def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.0001):
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.0001,
+              checkpoint='utils/check.pth', seed=42, num_workers=0):
+    if batch_size < 2:
+        raise ValueError(
+            "Training batch size must be at least 2 because the ASPP global "
+            "pooling branch uses BatchNorm on a 1 x 1 feature map."
+        )
+    set_seed(seed)
     # 创建日志目录
     log_dir = "training_logs"
     if not os.path.exists(log_dir):
@@ -66,9 +84,13 @@ def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.00
     
     # 加载数据集
     train_dataset = MoonDetection3(train_data_path)
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        dataset=train_dataset, batch_size=batch_size, shuffle=True,
+        pin_memory=torch.cuda.is_available(), num_workers=num_workers)
     val_dataset = MoonDetection3(val_data_path)
-    val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = torch.utils.data.DataLoader(
+        dataset=val_dataset, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers)
 
     # MALS-Net Models
     model = network.deeplabv3plus_ECAResNet50(
@@ -84,6 +106,7 @@ def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.00
 
     # best loss统计， 初始化为正无穷
     best_accuracy = 0.0
+    best_loss = float('inf')
     epoch_losses = []
     val_losses = []
 
@@ -166,8 +189,9 @@ def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.00
         
         if val_loss < best_loss:
                 best_loss = val_loss
-                torch.save(model.state_dict(), 'utils/check.pth')
-                print(f"Best model saved with accuracy: {best_accuracy:.4f}")
+                os.makedirs(os.path.dirname(checkpoint) or '.', exist_ok=True)
+                torch.save(model.state_dict(), checkpoint)
+                print(f"Best model saved to {checkpoint} with validation loss: {best_loss:.6f}")
         
         import matplotlib.pyplot as plt
         plt.switch_backend('Agg')
@@ -190,11 +214,22 @@ def train_net(train_data_path, val_data_path, epochs=100, batch_size=16, lr=0.00
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train MALS-Net.')
+    parser.add_argument('--train-dir', default='data/train')
+    parser.add_argument('--val-dir', default='data/val')
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--learning-rate', type=float, default=1e-4)
+    parser.add_argument('--checkpoint', default='utils/check.pth')
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--num-workers', type=int, default=0)
+    args = parser.parse_args()
     start_time = time.time()
-    train_data_path = '../data/train'
-    val_data_path = '../data/val'
-   
-    train_net(train_data_path, val_data_path)
+    train_net(
+        args.train_dir, args.val_dir, epochs=args.epochs,
+        batch_size=args.batch_size, lr=args.learning_rate,
+        checkpoint=args.checkpoint, seed=args.seed,
+        num_workers=args.num_workers)
     end_time = time.time()
     time_cout = get_time_hhmmss(start_time, end_time)
     print('time cost:', time_cout)

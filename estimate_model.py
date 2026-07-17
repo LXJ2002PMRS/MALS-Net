@@ -7,6 +7,8 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 import math
 import datetime
+import argparse
+import os
 gdal.DontUseExceptions()
 
 # read tif dataset
@@ -165,7 +167,7 @@ def calculate_compactness_similarity(label_components, predict_components, match
     if matches:
         compactness_similarities = []
         
-        for label_idx, predict_idx in matches:
+        for label_idx, predict_idx, _ in matches:
             label_comp = label_components[label_idx]
             predict_comp = predict_components[predict_idx]
             
@@ -190,10 +192,10 @@ def calculate_compactness_similarity(label_components, predict_components, match
 
 def comprehensive_component_assessment(label_mask, predict_mask, min_component_size=10):
     # 提取连通对象
-    label_components = extract_connected_components(
+    label_components, _, _, _ = extract_connected_components(
         label_mask, min_component_size
     )
-    predict_components = extract_connected_components(
+    predict_components, _, _, _ = extract_connected_components(
         predict_mask, min_component_size
     )
     
@@ -249,16 +251,18 @@ def comprehensive_component_assessment(label_mask, predict_mask, min_component_s
 def estimate(predict, label):
     predict_data = readTif(predict)
     label_data = readTif(label)
+    predict_binary = predict_data > 0
+    label_binary = label_data > 0
     
     # 像素级的混淆矩阵
     # TP(True Positive)
-    TP = ((predict_data == 255) & (label_data == 1)).sum()
+    TP = (predict_binary & label_binary).sum()
     # TN(True Negative)
-    TN = ((predict_data == 0) & (label_data == 0)).sum()
+    TN = ((~predict_binary) & (~label_binary)).sum()
     # FN(False Negative)
-    FN = ((predict_data == 0) & (label_data == 1)).sum()
+    FN = ((~predict_binary) & label_binary).sum()
     # FP(False Positive)
-    FP = ((predict_data == 255) & (label_data == 0)).sum()
+    FP = (predict_binary & (~label_binary)).sum()
     
     # 计算当前图片的像素级Precision
     current_precision = TP / (TP + FP) if (TP + FP) > 0 else 0
@@ -276,10 +280,15 @@ def write_to_file(file, content):
 
 
 if  __name__=='__main__':
+    parser = argparse.ArgumentParser(description='Evaluate MALS-Net predictions.')
+    parser.add_argument('--prediction-dir', default='utils/predict_test')
+    parser.add_argument('--label-dir', default='data/test/label')
+    parser.add_argument('--output', default=None)
+    args = parser.parse_args()
     
     # 创建输出文件
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"evaluation_results_{timestamp}.txt"
+    output_filename = args.output or f"evaluation_results_{timestamp}.txt"
     
     with open(output_filename, 'w', encoding='utf-8') as f:
         # 写入文件头
@@ -307,12 +316,14 @@ if  __name__=='__main__':
         compactness_similarities = []
         processed_images = 0
         
-        test_predict_Path = glob.glob('utils/predict/*.tif')
+        test_predict_Path = sorted(glob.glob(os.path.join(args.prediction_dir, '*.tif')))
+        if not test_predict_Path:
+            raise FileNotFoundError(f"No prediction TIFFs found in {args.prediction_dir}")
         write_to_file(f, f"开始处理 {len(test_predict_Path)} 张预测图片...")
         write_to_file(f, "")
         
         for predict_Path in tqdm(test_predict_Path):
-            label_Path = "../data/test/label/" + predict_Path.split('\\')[-1]
+            label_Path = os.path.join(args.label_dir, os.path.basename(predict_Path))
             TP, TN, FN, FP, component_assessment, current_precision = estimate(predict_Path, label_Path)
                        
             # 累加统计指标
