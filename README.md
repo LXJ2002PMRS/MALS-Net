@@ -109,7 +109,7 @@ python predict.py \
 
 The predicted binary TIFF masks are written to `utils/predict_test/` with the same filenames as the inputs.
 
-## 7. Reproduce the segmentation metrics
+## 7. Segmentation metrics
 
 After inference, calculate pixel-level, object-level, and geometric metrics:
 
@@ -122,23 +122,7 @@ python estimate_model.py \
 
 The report includes pixel precision, recall, F1 and IoU; object precision, recall, F1 and matched-object IoU; normalized centroid distance (NCD); and compactness similarity (CS). The object matching threshold and minimum component size follow the released evaluation implementation.
 
-For the complete paper split, the MALS-Net DOM + Depth configuration reported:
-
-| Level | Metric | Reported value |
-|---|---:|---:|
-| Pixel | Precision | 95.717% |
-| Pixel | Recall | 88.801% |
-| Pixel | F1 | 92.129% |
-| Pixel | IoU | 85.407% |
-| Object | Precision | 57.314% |
-| Object | Recall | 87.973% |
-| Object | F1 | 69.409% |
-| Geometric | NCD | 1.066% |
-| Geometric | CS | 82.966% |
-
-Small differences can arise from GPU kernels and software versions. Large differences usually indicate a different data split, missing paired tiles, an incorrect checkpoint, or non-binary labels.
-
-## 8. Reproduce model cost and inference speed
+## 8. Model cost and inference speed
 
 ```bash
 python eval_performance.py
@@ -146,16 +130,8 @@ python eval_performance.py
 
 This script profiles a batch of one 2 x 512 x 512 multimodal sample, performs 50 warm-up iterations and times 1,000 CUDA iterations. On the RTX 3090 configuration used in the manuscript, MALS-Net contained 40.77 M parameters, required 149.62 GFLOPs, and achieved 12.30 ms per tile (81.33 FPS).
 
-## 9. Quick smoke test with the bundled sample data
-
-The following short run checks environment setup, data loading, checkpoint creation, inference, and metric generation. It is not expected to reproduce the paper's final accuracy because the bundled sample is only a small subset.
-
-```bash
-python train.py --epochs 1 --batch-size 2 --checkpoint utils/smoke_check.pth
-python predict.py --checkpoint utils/smoke_check.pth --output-dir utils/smoke_predictions
-python estimate_model.py --prediction-dir utils/smoke_predictions --output smoke_evaluation.txt
-```
-
 ## Citation
 
-If you use this code or dataset, please cite the MALS-Net paper after publication.
+```
+Under review
+```
