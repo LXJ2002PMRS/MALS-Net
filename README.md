@@ -1,7 +1,5 @@
 # MALS-Net
 
-Official PyTorch implementation of **MALS-Net: A multimodal attention-enhanced segmentation network for detecting lunar lobate scarps**.
-
 MALS-Net accepts two aligned single-band 512 x 512 pixel inputs: a lunar digital orthophoto map (DOM) tile and its DAM V2-derived relative-depth tile. It produces a binary lobate-scarp mask.
 
 ## 1. Repository layout
@@ -21,7 +19,6 @@ MALS-Net/
 └── eval_performance.py
 ```
 
-The folder name `dem` is retained for compatibility with the released code; in the DOM + Depth experiment it contains the DAM V2 relative-depth tiles, not a metric DEM.
 
 ## 2. System requirements
 
@@ -59,8 +56,8 @@ Requirements:
 - Every DOM, depth, and label triplet must have the same filename and dimensions.
 - Inputs used in the paper are single-band 512 x 512 pixel TIFFs.
 - Labels are binary. The loader converts 0/255 labels to 0/1.
-- The repository includes a small sample subset for checking the pipeline. Reproducing the paper's reported values requires the complete released train/validation/test split and the same split assignment used in the manuscript.
-
+- The repository includes a small sample subset for checking the pipeline.
+- 
 Check that all file triplets are present:
 
 ```bash
@@ -123,7 +120,7 @@ python estimate_model.py \
   --output evaluation_results.txt
 ```
 
-The report includes pixel precision, recall, F1 and IoU; object precision, recall, F1 and matched-object IoU; normalized centroid distance (NCD); and compactness similarity (CS). The object matching threshold and minimum component size follow the released evaluation implementation.
+The report includes pixel precision, recall, F1 and IoU; object precision, recall, F1 and matched-object IoU; normalized centroid distance (NCD); and compactness similarity (CS).
 
 ## 8. Model cost and inference speed
 
