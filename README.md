@@ -66,7 +66,10 @@ Check that all file triplets are present:
 ```bash
 python -c "from pathlib import Path; root=Path('data'); [(lambda a,b,c: print(s, len(a), 'triplets', 'OK' if a==b==c else 'MISMATCH'))({p.name for p in (root/s/'image').glob('*.tif')},{p.name for p in (root/s/'dem').glob('*.tif')},{p.name for p in (root/s/'label').glob('*.tif')}) for s in ('train','val','test')]"
 ```
-
+##### Dataset
+```text
+https://pan.baidu.com/s/17ER19Lti0JibkG3-oZ0sWw?pwd=uany
+```
 ## 5. Train MALS-Net
 
 From the repository root, run:
@@ -132,6 +135,6 @@ This script profiles a batch of one 2 x 512 x 512 multimodal sample, performs 50
 
 ## Citation
 
-```
+```text
 Under review
 ```
